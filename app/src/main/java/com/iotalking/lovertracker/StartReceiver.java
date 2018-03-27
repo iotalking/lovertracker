@@ -1,4 +1,4 @@
-package com.iotalking.oldmangps;
+package com.iotalking.lovertracker;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;

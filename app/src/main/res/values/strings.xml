@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">OldManGPS</string>
+    <string name="app_name">爱心定位</string>
 
     <string name="title_activity_start">StartActivity</string>
     <string name="dummy_button">Dummy Button</string>
