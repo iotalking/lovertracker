@@ -6,21 +6,26 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.support.annotation.RequiresApi;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.KeyEvent;
 
 import com.baidu.location.BDLocation;
 import com.baidu.mapapi.SDKInitializer;
 import com.baidu.mapapi.map.BaiduMap;
 import com.baidu.mapapi.map.BitmapDescriptorFactory;
+import com.baidu.mapapi.map.MapStatusUpdate;
+import com.baidu.mapapi.map.MapStatusUpdateFactory;
 import com.baidu.mapapi.map.MapView;
 import com.baidu.mapapi.map.MyLocationConfiguration;
 import com.baidu.mapapi.map.MyLocationData;
 import com.baidu.mapapi.map.TextureMapView;
 import com.baidu.mapapi.map.UiSettings;
+import com.baidu.mapapi.model.LatLng;
 import com.iotalking.lovertracker.service.WakeupService;
 
 public class MainActivity extends AppCompatActivity {
@@ -41,11 +46,18 @@ public class MainActivity extends AppCompatActivity {
         requestGPSPerssion();
         registerReceiver();
         startService();
+        requestGPSPerssion();
     }
 
     @RequiresApi(api = Build.VERSION_CODES.M)
     void requestGPSPerssion(){
-        this.requestPermissions(new String[]{Manifest.permission_group.LOCATION},6666);
+        if(checkSelfPermission(Manifest.permission_group.LOCATION) != PackageManager.PERMISSION_GRANTED){
+            if(shouldShowRequestPermissionRationale(Manifest.permission_group.LOCATION)){
+
+            }else{
+                this.requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION},6666);
+            }
+        }
     }
 
     @Override
@@ -100,6 +112,8 @@ public class MainActivity extends AppCompatActivity {
 
     class MyReceiver extends BroadcastReceiver{
 
+        private static final String TAG = "MyReceiver";
+
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
@@ -109,11 +123,16 @@ public class MainActivity extends AppCompatActivity {
                 MyLocationData locData = new MyLocationData.Builder()
                         .accuracy(location.getRadius())
                         // 此处设置开发者获取到的方向信息，顺时针0-360
-                        .direction(100).latitude(location.getLatitude())
+                        .latitude(location.getLatitude())
                         .longitude(location.getLongitude()).build();
                 // 设置定位数据
                 mBaiduMap.setMyLocationData(locData);
-                MyLocationConfiguration config = new MyLocationConfiguration(MyLocationConfiguration.LocationMode.FOLLOWING, true, null);
+
+                LatLng ll = new LatLng(location.getLatitude(), location.getLongitude());
+                MapStatusUpdate u = MapStatusUpdateFactory.newLatLngZoom(ll, 20.0f);
+                mBaiduMap.animateMapStatus(u);
+
+                Log.i(TAG,"addr:"+location.getAddrStr());
             }
         }
     }

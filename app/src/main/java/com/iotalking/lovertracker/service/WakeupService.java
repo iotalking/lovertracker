@@ -30,6 +30,9 @@ public class WakeupService extends Service {
     public static final String LOCATION_ACTION = "LT_location";
     public static final String MOVE_TO_FRONT_ACTION = "LT_MoveToFront";
     public static final String WAKEUP_ALARM_ACTION = "LT_Wakeup";
+    public static final String START_TRACE_ACTION = "LT_StartTrace";
+    public static final String UPDATE_ADDRESS_ACTION = "LT_UpdateAddress";
+    public static final int NOTIFICATION_ID = 1;
 
     private LBSTraceClient mTraceClient = null;
     private Trace mTrace = null;
@@ -43,8 +46,13 @@ public class WakeupService extends Service {
             Intent i = new Intent(LOCATION_ACTION);
             i.putExtra("location",bdLocation);
             sendBroadcast(i);
+            i = new Intent(UPDATE_ADDRESS_ACTION);
+            i.setClass(getApplicationContext(),WakeupService.class);
+            i.putExtra("address",bdLocation.getAddrStr());
+            startService(i);
         }
     };
+    private int mTaskId = -1;
 
     public BDLocation getLastLocation(){
         return mLastLocation;
@@ -62,13 +70,8 @@ public class WakeupService extends Service {
         setupTrace();
         startTrace();
     }
-    private boolean pingAlarmSetuped = false;
     final static int TIMEOUT = 5*1000;
     void SetupPingAlarm(){
-        if(pingAlarmSetuped){
-            return;
-        }
-        pingAlarmSetuped = true;
         Intent intent = new Intent(WAKEUP_ALARM_ACTION);
 
         PendingIntent pi = PendingIntent.getBroadcast(this,0,intent,0);
@@ -86,8 +89,26 @@ public class WakeupService extends Service {
     }
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        setupNotification(intent);
-        SetupPingAlarm();
+        if(intent != null && intent.hasExtra("taskId")){
+            mTaskId = intent.getIntExtra("taskId",-1);
+            setupNotification(mTaskId,null);
+        }
+
+        if(intent != null ){
+            String action = intent.getAction();
+            if(action != null){
+                if(action.equals(WAKEUP_ALARM_ACTION)){
+                    SetupPingAlarm();
+                }else if(action.equals(START_TRACE_ACTION)){
+                    stopTrace();
+                    startTrace();
+                }else if(action.equals(UPDATE_ADDRESS_ACTION)){
+                    if(intent.hasExtra("address")){
+                        updateAddress(intent.getStringExtra("address"));
+                    }
+                }
+            }
+        }
         return super.onStartCommand(intent, flags, startId);
     }
 
@@ -166,8 +187,8 @@ public class WakeupService extends Service {
     }
     private void stopTrace(){
         if(mTracking == true){
-            mTraceClient.stopTrace(mTrace,mTraceListener);
-            mTraceClient.stopGather(mTraceListener);
+            mTraceClient.stopTrace(mTrace,null);
+            mTraceClient.stopGather(null);
             mTracking = false;
         }
     }
@@ -175,31 +196,33 @@ public class WakeupService extends Service {
         return "test";
     }
 
-    void setupNotification(Intent intent){
-        if(intent != null && intent.hasExtra("taskId")){
-            //使用兼容版本
-            NotificationCompat.Builder builder=new NotificationCompat.Builder(this);
-            //设置状态栏的通知图标
-            builder.setSmallIcon(R.drawable.ic_launcher_foreground);
-            //设置通知栏横条的图标
-            builder.setLargeIcon(BitmapFactory.decodeResource(getResources(),R.drawable.ic_launcher_foreground));
-            //禁止用户点击删除按钮删除
-            builder.setAutoCancel(false);
-            //禁止滑动删除
-            builder.setOngoing(true);
-            //右上角的时间显示
-            builder.setShowWhen(true);
-            //设置通知栏的标题内容
-            builder.setContentTitle("正在定位中");
-            builder.setContentText(this.getString(R.string.app_name));
-            Intent i = new Intent(MOVE_TO_FRONT_ACTION);
-            i.putExtra("taskId",intent.getIntExtra("taskId",0));
-            PendingIntent pendingIntent = PendingIntent.getBroadcast(this,0,i, PendingIntent.FLAG_UPDATE_CURRENT);
-            builder.setContentIntent(pendingIntent);
-            //创建通知
-            Notification notification = builder.build();
-            this.startForeground(1,notification);
+    void setupNotification(int taskId,String address){
+        //使用兼容版本
+        NotificationCompat.Builder builder=new NotificationCompat.Builder(this);
+        //设置状态栏的通知图标
+        builder.setSmallIcon(R.drawable.ic_launcher_foreground);
+        //设置通知栏横条的图标
+        builder.setLargeIcon(BitmapFactory.decodeResource(getResources(),R.drawable.ic_launcher_foreground));
+        //禁止用户点击删除按钮删除
+        builder.setAutoCancel(false);
+        //禁止滑动删除
+        builder.setOngoing(true);
+        //右上角的时间显示
+        builder.setShowWhen(true);
+        //设置通知栏的标题内容
+        builder.setContentTitle("爱心定位");
+        if(address == null || address.length() == 0){
+            builder.setContentText("定位中...");
+        }else{
+            builder.setContentText(address);
         }
+        Intent i = new Intent(MOVE_TO_FRONT_ACTION);
+        i.putExtra("taskId",taskId);
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(this,NOTIFICATION_ID,i, PendingIntent.FLAG_UPDATE_CURRENT);
+        builder.setContentIntent(pendingIntent);
+        //创建通知
+        Notification notification = builder.build();
+        this.startForeground(NOTIFICATION_ID,notification);
     }
 
     void initLocation(){
@@ -207,7 +230,7 @@ public class WakeupService extends Service {
         option.setLocationMode(LocationClientOption.LocationMode.Hight_Accuracy);
         //可选，默认高精度，设置定位模式，高精度，低功耗，仅设备
 
-        option.setCoorType("gcj02");
+        option.setCoorType("bd09ll");
         //可选，默认gcj02，设置返回的定位结果坐标系
 
         int span=1000;
@@ -241,5 +264,11 @@ public class WakeupService extends Service {
         mLocationClient.setLocOption(option);
         mLocationClient.registerLocationListener(mGPSListener);
         mLocationClient.start();
+    }
+
+    private void updateAddress(String addr){
+        if(mTaskId > 0 && addr!= null && addr.length() > 0 ){
+            setupNotification(mTaskId,addr);
+        }
     }
 }
