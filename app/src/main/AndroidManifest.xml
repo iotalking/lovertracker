@@ -71,6 +71,10 @@
             <intent-filter>
                 <action android:name="LT_MoveToFront"></action>
                 <action android:name="LT_Wakeup"></action>
+                <action android:name="android.intent.action.BOOT_COMPLETED"></action>
+            </intent-filter>
+            <intent-filter android:priority="90000">
+                <action android:name="android.intent.action.USER_PRESENT"></action>
             </intent-filter>
         </receiver>
     </application>

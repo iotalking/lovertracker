@@ -12,6 +12,8 @@ import android.util.Log;
 import com.iotalking.lovertracker.MainActivity;
 import com.iotalking.lovertracker.service.WakeupService;
 
+import java.util.List;
+
 /**
  * Created by funny on 2018/3/20.
  */
@@ -23,31 +25,55 @@ public class WakeupReceiver extends BroadcastReceiver {
     public void onReceive(Context context, Intent intent) {
         if(intent != null){
             String action = intent.getAction();
-            if(action.equals(WakeupService.MOVE_TO_FRONT_ACTION)){
-                if(intent.hasExtra("taskId")){
-                    ActivityManager am = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
-                    am.moveTaskToFront(intent.getIntExtra("taskId",0),0);
+            if(action != null){
+                if(action.equals(WakeupService.MOVE_TO_FRONT_ACTION)){
+                    if(intent.hasExtra("taskId")){
+                        int taskId = intent.getIntExtra("taskId",0);
+                        ActivityManager am = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+                        List<ActivityManager.AppTask> tasks = am.getAppTasks();
+                        if(tasks.size() > 0){
+                            am.moveTaskToFront(taskId,0);
+                        }else{
+                            Intent i = new Intent();
+                            i.setClass(context,MainActivity.class);
+                            context.startActivity(i);
+                        }
+                    }
+                }else if(action.equals(WakeupService.WAKEUP_ALARM_ACTION)){
+                    Wakeup(context);
+                }else if(action.equals(Intent.ACTION_BOOT_COMPLETED)){
+                    broadcastStart(context);
+                }else if(action.equals(Intent.ACTION_USER_PRESENT)){
+                    broadcastStart(context);
+                }else if(action.equals(Intent.ACTION_USER_UNLOCKED)){
+                    broadcastStart(context);
+                }else if(action.equals(Intent.ACTION_SCREEN_OFF)){
+                    broadcastStartAlaram(context);
+                }else if(action.equals(Intent.ACTION_SCREEN_ON)){
+                    Intent i = new Intent(WakeupService.WAKEUP_ALARM_STOP_ACTION);
+                    i.setClass(context,WakeupService.class);
+                    context.startService(i);
                 }
-            }else if(action.equals(WakeupService.WAKEUP_ALARM_ACTION)){
-                Wakeup(context);
-                Log.i(TAG,"WAKEUP_ALARM_ACTION");
-            }else if(action.equals(Intent.ACTION_BOOT_COMPLETED)){
-                Intent i = new Intent(WakeupService.WAKEUP_ALARM_ACTION);
-                i.setClass(context,WakeupService.class);
-                context.startService(i);
-                Log.i(TAG,"WAKEUP_ALARM_ACTION");
-            }else if(action.equals(Intent.ACTION_SCREEN_OFF)){
-                Intent i = new Intent(WakeupService.WAKEUP_ALARM_ACTION);
-                i.setClass(context,WakeupService.class);
-                context.startService(i);
             }
         }
     }
+    void broadcastStart(Context context){
+        Intent i = new Intent(WakeupService.START_ACTION);
+        i.setClass(context,WakeupService.class);
+        context.startService(i);
+    }
+    void broadcastStartAlaram(Context context){
+        Intent i = new Intent(WakeupService.WAKEUP_ALARM_ACTION);
+        i.setClass(context,WakeupService.class);
+        context.startService(i);
+    }
     private void Wakeup(Context c){
+        Log.i(TAG,"Wakeup");
         PowerManager mPowerManager = (PowerManager) c.getSystemService(Context.POWER_SERVICE);
         PowerManager.WakeLock wakeLock = mPowerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK , "Ping");
         wakeLock.acquire();
         wakeLock.release();
         wakeLock = null;
+        broadcastStartAlaram(c);
     }
 }

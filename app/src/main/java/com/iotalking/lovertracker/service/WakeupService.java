@@ -6,11 +6,13 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.graphics.BitmapFactory;
 import android.os.Build;
 import android.os.IBinder;
 import android.support.annotation.Nullable;
 import android.support.v4.app.NotificationCompat;
+import android.util.Log;
 
 import com.baidu.location.BDAbstractLocationListener;
 import com.baidu.location.BDLocation;
@@ -21,24 +23,29 @@ import com.baidu.trace.Trace;
 import com.baidu.trace.model.OnTraceListener;
 import com.baidu.trace.model.PushMessage;
 import com.iotalking.lovertracker.R;
+import com.iotalking.lovertracker.receiver.WakeupReceiver;
 
 /**
  * Created by funny on 2018/3/20.
  */
 
 public class WakeupService extends Service {
+    public static final String START_ACTION = "LT_Start";
     public static final String LOCATION_ACTION = "LT_location";
     public static final String MOVE_TO_FRONT_ACTION = "LT_MoveToFront";
     public static final String WAKEUP_ALARM_ACTION = "LT_Wakeup";
+    public static final String WAKEUP_ALARM_STOP_ACTION = "LT_WakeupAlarmStop";
     public static final String START_TRACE_ACTION = "LT_StartTrace";
     public static final String UPDATE_ADDRESS_ACTION = "LT_UpdateAddress";
+    public static final String RESTART_GPS_ACTION = "LT_RestartGPS";
     public static final int NOTIFICATION_ID = 1;
+    private static final String TAG = "WakeupService";
 
     private LBSTraceClient mTraceClient = null;
     private Trace mTrace = null;
     private boolean mTracking;
     private LocationClient mLocationClient;
-    private BDLocation mLastLocation = null;
+    private static BDLocation mLastLocation = null;
     private BDAbstractLocationListener mGPSListener = new BDAbstractLocationListener() {
         @Override
         public void onReceiveLocation(BDLocation bdLocation) {
@@ -53,8 +60,9 @@ public class WakeupService extends Service {
         }
     };
     private int mTaskId = -1;
+    private WakeupReceiver mReceiver;
 
-    public BDLocation getLastLocation(){
+    public static BDLocation getLastLocation(){
         return mLastLocation;
     }
     @Nullable
@@ -66,6 +74,7 @@ public class WakeupService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        registerReceiver();
         initLocation();
         setupTrace();
         startTrace();
@@ -86,6 +95,13 @@ public class WakeupService extends Service {
         }else{
             am.setRepeating(AlarmManager.RTC_WAKEUP,System.currentTimeMillis(),TIMEOUT,pi);
         }
+
+    }
+    void StopAlarm(){
+        Intent intent = new Intent(WAKEUP_ALARM_ACTION);
+        PendingIntent pi = PendingIntent.getBroadcast(this,0,intent,PendingIntent.FLAG_CANCEL_CURRENT|PendingIntent.FLAG_NO_CREATE);
+        AlarmManager am = (AlarmManager)getSystemService(Context.ALARM_SERVICE);
+        am.cancel(pi);
     }
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
@@ -97,11 +113,22 @@ public class WakeupService extends Service {
         if(intent != null ){
             String action = intent.getAction();
             if(action != null){
-                if(action.equals(WAKEUP_ALARM_ACTION)){
+                if(action.equals(START_ACTION)){
+                    Log.i(TAG,"started");
+                }else if(action.equals(WAKEUP_ALARM_ACTION)){
                     SetupPingAlarm();
+                }else if(action.equals(WAKEUP_ALARM_STOP_ACTION)){
+                    StopAlarm();
                 }else if(action.equals(START_TRACE_ACTION)){
                     stopTrace();
                     startTrace();
+                }else if(action.equals(RESTART_GPS_ACTION)){
+                    if(mLocationClient != null){
+                        mLocationClient.stop();
+                    }
+                    initLocation();
+
+                    mLocationClient.start();
                 }else if(action.equals(UPDATE_ADDRESS_ACTION)){
                     if(intent.hasExtra("address")){
                         updateAddress(intent.getStringExtra("address"));
@@ -112,6 +139,15 @@ public class WakeupService extends Service {
         return super.onStartCommand(intent, flags, startId);
     }
 
+    void registerReceiver(){
+        if(mReceiver == null){
+            mReceiver = new WakeupReceiver();
+            IntentFilter filter = new IntentFilter();
+            filter.addAction(Intent.ACTION_SCREEN_OFF);
+            filter.addAction(Intent.ACTION_SCREEN_ON);
+            registerReceiver(mReceiver,filter);
+        }
+    }
     void setupTrace(){
         // 轨迹服务ID
         long serviceId = 161814;

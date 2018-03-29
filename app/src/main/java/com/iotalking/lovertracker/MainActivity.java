@@ -29,7 +29,7 @@ import com.baidu.mapapi.model.LatLng;
 import com.iotalking.lovertracker.service.WakeupService;
 
 public class MainActivity extends AppCompatActivity {
-
+    private static final String TAG = "MainActivity";
     private TextureMapView mMapView;
     private BaiduMap mBaiduMap;
     private MyReceiver mReceiver;
@@ -49,13 +49,35 @@ public class MainActivity extends AppCompatActivity {
         requestGPSPerssion();
     }
 
+    final int GPS_REQUEST_CODE = 6666;
     @RequiresApi(api = Build.VERSION_CODES.M)
     void requestGPSPerssion(){
         if(checkSelfPermission(Manifest.permission_group.LOCATION) != PackageManager.PERMISSION_GRANTED){
             if(shouldShowRequestPermissionRationale(Manifest.permission_group.LOCATION)){
 
             }else{
-                this.requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION},6666);
+                this.requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION},GPS_REQUEST_CODE);
+            }
+        }else{
+            setMyLocation(WakeupService.getLastLocation());
+        }
+    }
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults){
+        if(requestCode == GPS_REQUEST_CODE){
+            boolean gpsGranted = false;
+            for(int i = 0;i<permissions.length;i++){
+                String permission = permissions[i];
+                if(permission.equals(Manifest.permission.ACCESS_FINE_LOCATION) ||
+                        permission.equals(Manifest.permission.ACCESS_COARSE_LOCATION)){
+                    if(grantResults[i] == PackageManager.PERMISSION_GRANTED){
+                        gpsGranted = true;
+                        break;
+                    }
+                }
+            }
+            if(gpsGranted){
+                setMyLocation(WakeupService.getLastLocation());
             }
         }
     }
@@ -110,29 +132,37 @@ public class MainActivity extends AppCompatActivity {
         mMapView.onPause();
     }
 
-    class MyReceiver extends BroadcastReceiver{
+    void setMyLocation(BDLocation location){
+        if(location == null){
+            Intent i = new Intent();
+            i.setClass(this,WakeupService.class);
+            i.setAction(WakeupService.RESTART_GPS_ACTION);
+            startService(i);
+            return;
+        }
+        // 构造定位数据
+        MyLocationData locData = new MyLocationData.Builder()
+                .accuracy(location.getRadius())
+                // 此处设置开发者获取到的方向信息，顺时针0-360
+                .latitude(location.getLatitude())
+                .longitude(location.getLongitude()).build();
+        // 设置定位数据
+        mBaiduMap.setMyLocationData(locData);
 
-        private static final String TAG = "MyReceiver";
+        LatLng ll = new LatLng(location.getLatitude(), location.getLongitude());
+        MapStatusUpdate u = MapStatusUpdateFactory.newLatLngZoom(ll, 20.0f);
+        mBaiduMap.animateMapStatus(u);
+
+        Log.i(TAG,"addr:"+location.getAddrStr());
+    }
+    class MyReceiver extends BroadcastReceiver{
 
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
             if(action.equals(WakeupService.LOCATION_ACTION)){
                 BDLocation location = intent.getParcelableExtra("location");
-                // 构造定位数据
-                MyLocationData locData = new MyLocationData.Builder()
-                        .accuracy(location.getRadius())
-                        // 此处设置开发者获取到的方向信息，顺时针0-360
-                        .latitude(location.getLatitude())
-                        .longitude(location.getLongitude()).build();
-                // 设置定位数据
-                mBaiduMap.setMyLocationData(locData);
-
-                LatLng ll = new LatLng(location.getLatitude(), location.getLongitude());
-                MapStatusUpdate u = MapStatusUpdateFactory.newLatLngZoom(ll, 20.0f);
-                mBaiduMap.animateMapStatus(u);
-
-                Log.i(TAG,"addr:"+location.getAddrStr());
+                setMyLocation(location);
             }
         }
     }
