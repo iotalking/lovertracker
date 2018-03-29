@@ -57,6 +57,7 @@ public class WakeupService extends Service {
             i.setClass(getApplicationContext(),WakeupService.class);
             i.putExtra("address",bdLocation.getAddrStr());
             startService(i);
+            Log.i(TAG,"onReceiveLocation");
         }
     };
     private int mTaskId = -1;
@@ -124,11 +125,11 @@ public class WakeupService extends Service {
                     startTrace();
                 }else if(action.equals(RESTART_GPS_ACTION)){
                     if(mLocationClient != null){
+                        mLocationClient.unRegisterLocationListener(mGPSListener);
                         mLocationClient.stop();
                     }
                     initLocation();
 
-                    mLocationClient.start();
                 }else if(action.equals(UPDATE_ADDRESS_ACTION)){
                     if(intent.hasExtra("address")){
                         updateAddress(intent.getStringExtra("address"));
@@ -269,7 +270,7 @@ public class WakeupService extends Service {
         option.setCoorType("bd09ll");
         //可选，默认gcj02，设置返回的定位结果坐标系
 
-        int span=1000;
+        int span=1000*10;
         option.setScanSpan(span);
         //可选，默认0，即仅定位一次，设置发起定位请求的间隔需要大于等于1000ms才是有效的
 

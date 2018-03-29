@@ -64,6 +64,7 @@
         <service
             android:name=".service.WakeupService"
             ></service>
+        <service android:name="com.baidu.location.f" android:enabled="true" android:process=":remote"> </service>
 
         <receiver
             android:name=".receiver.WakeupReceiver"
