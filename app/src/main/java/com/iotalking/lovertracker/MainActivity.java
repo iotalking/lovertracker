@@ -152,8 +152,6 @@ public class MainActivity extends AppCompatActivity {
         LatLng ll = new LatLng(location.getLatitude(), location.getLongitude());
         MapStatusUpdate u = MapStatusUpdateFactory.newLatLngZoom(ll, 20.0f);
         mBaiduMap.animateMapStatus(u);
-
-        Log.i(TAG,"addr:"+location.getAddrStr());
     }
     class MyReceiver extends BroadcastReceiver{
 

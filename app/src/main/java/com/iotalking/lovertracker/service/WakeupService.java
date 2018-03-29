@@ -57,7 +57,6 @@ public class WakeupService extends Service {
             i.setClass(getApplicationContext(),WakeupService.class);
             i.putExtra("address",bdLocation.getAddrStr());
             startService(i);
-            Log.i(TAG,"onReceiveLocation");
         }
     };
     private int mTaskId = -1;
@@ -80,7 +79,7 @@ public class WakeupService extends Service {
         setupTrace();
         startTrace();
     }
-    final static int TIMEOUT = 5*1000;
+    final static int TIMEOUT = 60*1000;
     void SetupPingAlarm(){
         Intent intent = new Intent(WAKEUP_ALARM_ACTION);
 
