@@ -10,6 +10,7 @@ import android.content.IntentFilter;
 import android.graphics.BitmapFactory;
 import android.os.Build;
 import android.os.IBinder;
+import android.os.PowerManager;
 import android.support.annotation.Nullable;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
@@ -59,6 +60,8 @@ public class WakeupService extends Service {
             startService(i);
         }
     };
+
+
     private int mTaskId = -1;
     private WakeupReceiver mReceiver;
 
@@ -107,7 +110,11 @@ public class WakeupService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         if(intent != null && intent.hasExtra("taskId")){
             mTaskId = intent.getIntExtra("taskId",-1);
-            setupNotification(mTaskId,null);
+            String addr = null;
+            if(mLastLocation != null){
+                addr = mLastLocation.getAddrStr();
+            }
+            setupNotification(mTaskId,addr);
         }
 
         if(intent != null ){
@@ -143,9 +150,16 @@ public class WakeupService extends Service {
         if(mReceiver == null){
             mReceiver = new WakeupReceiver();
             IntentFilter filter = new IntentFilter();
+            filter.addAction(Intent.ACTION_USER_PRESENT);
             filter.addAction(Intent.ACTION_SCREEN_OFF);
             filter.addAction(Intent.ACTION_SCREEN_ON);
             registerReceiver(mReceiver,filter);
+        }
+    }
+    void unregisterReceiver(){
+        if(mReceiver != null){
+            unregisterReceiver(mReceiver);
+            mReceiver = null;
         }
     }
     void setupTrace(){
@@ -208,6 +222,7 @@ public class WakeupService extends Service {
     public void onDestroy() {
         super.onDestroy();
         stopTrace();
+        unregisterReceiver();
         if(mLocationClient!=null){
             mLocationClient.stop();;
             mLocationClient = null;
