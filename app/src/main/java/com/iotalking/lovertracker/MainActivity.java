@@ -9,6 +9,7 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.provider.Settings;
 import android.support.annotation.RequiresApi;
 import android.support.v7.app.AppCompatActivity;
 import android.view.KeyEvent;
@@ -66,6 +67,7 @@ public class MainActivity extends AppCompatActivity {
         registerReceiver();
         startService();
         requestGPSPerssion();
+
     }
 
     final int GPS_REQUEST_CODE = 6666;
@@ -126,7 +128,6 @@ public class MainActivity extends AppCompatActivity {
     void startService(){
         Intent i = new Intent();
         i.setClass(this,WakeupService.class);
-        i.putExtra("taskId",getTaskId());
         startService(i);
     }
 

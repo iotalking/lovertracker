@@ -27,17 +27,14 @@ public class WakeupReceiver extends BroadcastReceiver {
             String action = intent.getAction();
             if(action != null){
                 if(action.equals(WakeupService.MOVE_TO_FRONT_ACTION)){
-                    if(intent.hasExtra("taskId")){
-                        int taskId = intent.getIntExtra("taskId",0);
-                        ActivityManager am = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
-                        List<ActivityManager.AppTask> tasks = am.getAppTasks();
-                        if(tasks.size() > 0){
-                            am.moveTaskToFront(taskId,0);
-                        }else{
-                            Intent i = new Intent();
-                            i.setClass(context,MainActivity.class);
-                            context.startActivity(i);
-                        }
+                    ActivityManager am = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+                    List<ActivityManager.AppTask> tasks = am.getAppTasks();
+                    if(tasks.size() > 0){
+                        tasks.get(0).moveToFront();
+                    }else{
+                        Intent i = new Intent();
+                        i.setClass(context,MainActivity.class);
+                        context.startActivity(i);
                     }
                 }else if(action.equals(WakeupService.WAKEUP_ALARM_ACTION)){
                     Wakeup(context);

@@ -8,9 +8,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.BitmapFactory;
+import android.net.Uri;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.PowerManager;
+import android.provider.Settings;
 import android.support.annotation.Nullable;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
@@ -21,10 +23,13 @@ import com.baidu.location.LocationClient;
 import com.baidu.location.LocationClientOption;
 import com.baidu.trace.LBSTraceClient;
 import com.baidu.trace.Trace;
+import com.baidu.trace.model.LocationMode;
 import com.baidu.trace.model.OnTraceListener;
 import com.baidu.trace.model.PushMessage;
 import com.iotalking.lovertracker.R;
 import com.iotalking.lovertracker.receiver.WakeupReceiver;
+
+import java.util.UUID;
 
 /**
  * Created by funny on 2018/3/20.
@@ -39,7 +44,7 @@ public class WakeupService extends Service {
     public static final String START_TRACE_ACTION = "LT_StartTrace";
     public static final String UPDATE_ADDRESS_ACTION = "LT_UpdateAddress";
     public static final String RESTART_GPS_ACTION = "LT_RestartGPS";
-    public static final int NOTIFICATION_ID = 1;
+    public static final int NOTIFICATION_ID = 1001;
     private static final String TAG = "WakeupService";
 
     private LBSTraceClient mTraceClient = null;
@@ -62,9 +67,9 @@ public class WakeupService extends Service {
     };
 
 
-    private int mTaskId = -1;
     private WakeupReceiver mReceiver;
-
+    PowerManager.WakeLock mWakeLock;
+    PowerManager mPowerManager;
     public static BDLocation getLastLocation(){
         return mLastLocation;
     }
@@ -81,6 +86,31 @@ public class WakeupService extends Service {
         initLocation();
         setupTrace();
         startTrace();
+        mPowerManager = (PowerManager) this.getSystemService(Context.POWER_SERVICE);
+        mWakeLock = mPowerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK , "Ping");
+        mWakeLock.acquire();
+
+        ignoreBatteryOptimizations();
+
+
+    }
+
+    void ignoreBatteryOptimizations(){
+        // 在Android 6.0及以上系统，若定制手机使用到doze模式，请求将应用添加到白名单。
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            String packageName = getPackageName();
+            boolean isIgnoring = mPowerManager.isIgnoringBatteryOptimizations(packageName);
+            if (!isIgnoring) {
+                Intent intent = new Intent(
+                        Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                intent.setData(Uri.parse("package:" + packageName));
+                try {
+                    startActivity(intent);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            }
+        }
     }
     final static int TIMEOUT = 60*1000;
     void SetupPingAlarm(){
@@ -108,14 +138,12 @@ public class WakeupService extends Service {
     }
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if(intent != null && intent.hasExtra("taskId")){
-            mTaskId = intent.getIntExtra("taskId",-1);
-            String addr = null;
-            if(mLastLocation != null){
-                addr = mLastLocation.getAddrStr();
-            }
-            setupNotification(mTaskId,addr);
+
+        String addr = null;
+        if(mLastLocation != null){
+            addr = mLastLocation.getAddrStr();
         }
+        setupNotification(addr);
 
         if(intent != null ){
             String action = intent.getAction();
@@ -178,6 +206,7 @@ public class WakeupService extends Service {
         int gatherInterval = 10;
         // 打包回传周期(单位:秒)
         int packInterval = 10;
+        mTraceClient.setLocationMode(LocationMode.High_Accuracy);
         // 设置定位和打包周期
         mTraceClient.setInterval(gatherInterval, packInterval);
     }
@@ -227,6 +256,10 @@ public class WakeupService extends Service {
             mLocationClient.stop();;
             mLocationClient = null;
         }
+        if(mWakeLock != null){
+            mWakeLock.release();
+            mWakeLock = null;
+        }
     }
 
     private void startTrace() {
@@ -244,10 +277,11 @@ public class WakeupService extends Service {
         }
     }
     private String genDeviceId() {
-        return "test";
+        String id = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+        return id;
     }
 
-    void setupNotification(int taskId,String address){
+    void setupNotification(String address){
         //使用兼容版本
         NotificationCompat.Builder builder=new NotificationCompat.Builder(this);
         //设置状态栏的通知图标
@@ -255,11 +289,12 @@ public class WakeupService extends Service {
         //设置通知栏横条的图标
         builder.setLargeIcon(BitmapFactory.decodeResource(getResources(),R.drawable.ic_launcher_foreground));
         //禁止用户点击删除按钮删除
-        builder.setAutoCancel(false);
+        builder.setAutoCancel(true);
         //禁止滑动删除
         builder.setOngoing(true);
         //右上角的时间显示
         builder.setShowWhen(true);
+        builder.setWhen(System.currentTimeMillis());
         //设置通知栏的标题内容
         builder.setContentTitle("爱心定位");
         if(address == null || address.length() == 0){
@@ -267,13 +302,19 @@ public class WakeupService extends Service {
         }else{
             builder.setContentText(address);
         }
+        builder.setDefaults(Notification.DEFAULT_SOUND);
+
         Intent i = new Intent(MOVE_TO_FRONT_ACTION);
-        i.putExtra("taskId",taskId);
         PendingIntent pendingIntent = PendingIntent.getBroadcast(this,NOTIFICATION_ID,i, PendingIntent.FLAG_UPDATE_CURRENT);
         builder.setContentIntent(pendingIntent);
         //创建通知
         Notification notification = builder.build();
+
         this.startForeground(NOTIFICATION_ID,notification);
+
+        if(mLocationClient != null){
+            mLocationClient.enableLocInForeground(1001,notification);
+        }
     }
 
     void initLocation(){
@@ -315,11 +356,12 @@ public class WakeupService extends Service {
         mLocationClient.setLocOption(option);
         mLocationClient.registerLocationListener(mGPSListener);
         mLocationClient.start();
+
     }
 
     private void updateAddress(String addr){
-        if(mTaskId > 0 && addr!= null && addr.length() > 0 ){
-            setupNotification(mTaskId,addr);
+        if(addr!= null && addr.length() > 0 ){
+            setupNotification(addr);
         }
     }
 }
