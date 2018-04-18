@@ -21,9 +21,15 @@ import com.baidu.mapapi.map.BaiduMap;
 import com.baidu.mapapi.map.MapStatusUpdate;
 import com.baidu.mapapi.map.MapStatusUpdateFactory;
 import com.baidu.mapapi.map.MyLocationData;
+import com.baidu.mapapi.map.OverlayOptions;
+import com.baidu.mapapi.map.Polyline;
+import com.baidu.mapapi.map.PolylineOptions;
 import com.baidu.mapapi.map.TextureMapView;
 import com.baidu.mapapi.model.LatLng;
 import com.iotalking.lovertracker.service.WakeupService;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
@@ -51,6 +57,7 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     };
+    private Polyline mPolyline;
 
     @RequiresApi(api = Build.VERSION_CODES.M)
     @Override
@@ -179,7 +186,20 @@ public class MainActivity extends AppCompatActivity {
         LatLng ll = new LatLng(location.getLatitude(), location.getLongitude());
         MapStatusUpdate u = MapStatusUpdateFactory.newLatLngZoom(ll, 20.0f);
         mBaiduMap.animateMapStatus(u);
+
+        if(mPolyline != null){
+            mPolyline.remove();
+            mPolyline = null;
+        }
+        if(mMyPoints.size() > 1){
+            OverlayOptions ooPolyline = new PolylineOptions().width(10)
+                    .color(0xAAFF0000).points(mMyPoints);
+            mPolyline = (Polyline) mBaiduMap.addOverlay(ooPolyline);
+        }
     }
+
+    List<LatLng> mMyPoints= new ArrayList<LatLng>();
+
     class MyReceiver extends BroadcastReceiver{
 
         @Override
@@ -187,6 +207,7 @@ public class MainActivity extends AppCompatActivity {
             String action = intent.getAction();
             if(action.equals(WakeupService.LOCATION_ACTION)){
                 BDLocation location = intent.getParcelableExtra("location");
+                mMyPoints.add(new LatLng(location.getLatitude(),location.getLongitude()));
                 setMyLocation(location);
             }
         }

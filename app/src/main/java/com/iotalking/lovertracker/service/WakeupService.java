@@ -302,7 +302,7 @@ public class WakeupService extends Service {
         }else{
             builder.setContentText(address);
         }
-        builder.setDefaults(Notification.DEFAULT_SOUND);
+//        builder.setDefaults(Notification.DEFAULT_SOUND);
 
         Intent i = new Intent(MOVE_TO_FRONT_ACTION);
         PendingIntent pendingIntent = PendingIntent.getBroadcast(this,NOTIFICATION_ID,i, PendingIntent.FLAG_UPDATE_CURRENT);
@@ -325,9 +325,10 @@ public class WakeupService extends Service {
         option.setCoorType("bd09ll");
         //可选，默认gcj02，设置返回的定位结果坐标系
 
-        int span=1000*10;
-        option.setScanSpan(span);
+//        int span=1000*10;
+//        option.setScanSpan(span);
         //可选，默认0，即仅定位一次，设置发起定位请求的间隔需要大于等于1000ms才是有效的
+        option.setOpenAutoNotifyMode();
 
         option.setIsNeedAddress(true);
         //可选，设置是否需要地址信息，默认不需要
